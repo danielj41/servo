@@ -1980,39 +1980,7 @@ impl ScriptThread {
         // Notify devtools that a new script global exists.
         self.notify_devtools(document.Title(), final_url.clone(), (incomplete.pipeline_id, None));
 
-        let is_javascript = incomplete.url.scheme() == "javascript";
-        let parse_input = if is_javascript {
-            use url::percent_encoding::percent_decode;
-
-            // Turn javascript: URL into JS code to eval, according to the steps in
-            // https://html.spec.whatwg.org/multipage/#javascript-protocol
-
-            // This slice of the URL’s serialization is equivalent to (5.) to (7.):
-            // Start with the scheme data of the parsed URL;
-            // append question mark and query component, if any;
-            // append number sign and fragment component if any.
-            let encoded = &incomplete.url[Position::BeforePath..];
-
-            // Percent-decode (8.) and UTF-8 decode (9.)
-            let script_source = percent_decode(encoded.as_bytes()).decode_utf8_lossy();
-
-            // Script source is ready to be evaluated (11.)
-            unsafe {
-                let _ac = JSAutoCompartment::new(self.get_cx(), window.reflector().get_jsobject().get());
-                rooted!(in(self.get_cx()) let mut jsval = UndefinedValue());
-                window.upcast::<GlobalScope>().evaluate_js_on_global_with_result(
-                    &script_source, jsval.handle_mut());
-                let strval = DOMString::from_jsval(self.get_cx(),
-                                                   jsval.handle(),
-                                                   StringificationBehavior::Empty);
-                match strval {
-                    Ok(ConversionResult::Success(s)) => s,
-                    _ => DOMString::new(),
-                }
-            }
-        } else {
-            DOMString::new()
-        };
+        let parse_input = DOMString::new();
 
         document.set_https_state(metadata.https_state);
 
@@ -2201,6 +2169,40 @@ impl ScriptThread {
                 }
             }
             None => {
+                let is_javascript = incomplete.url.scheme() == "javascript";
+                let parse_input = if is_javascript {
+                    use url::percent_encoding::percent_decode;
+
+                    // Turn javascript: URL into JS code to eval, according to the steps in
+                    // https://html.spec.whatwg.org/multipage/#javascript-protocol
+
+                    // This slice of the URL’s serialization is equivalent to (5.) to (7.):
+                    // Start with the scheme data of the parsed URL;
+                    // append question mark and query component, if any;
+                    // append number sign and fragment component if any.
+                    let encoded = &incomplete.url[Position::BeforePath..];
+
+                    // Percent-decode (8.) and UTF-8 decode (9.)
+                    let script_source = percent_decode(encoded.as_bytes()).decode_utf8_lossy();
+
+                    // Script source is ready to be evaluated (11.)
+                    unsafe {
+                        let _ac = JSAutoCompartment::new(self.get_cx(), window.reflector().get_jsobject().get());
+                        rooted!(in(self.get_cx()) let mut jsval = UndefinedValue());
+                        window.upcast::<GlobalScope>().evaluate_js_on_global_with_result(
+                            &script_source, jsval.handle_mut());
+                        let strval = DOMString::from_jsval(self.get_cx(),
+                                                           jsval.handle(),
+                                                           StringificationBehavior::Empty);
+                        match strval {
+                            Ok(ConversionResult::Success(s)) => s,
+                            _ => DOMString::new(),
+                        }
+                    }
+                } else {
+                    DOMString::new()
+                };
+
                 self.constellation_chan
                     .send(ConstellationMsg::LoadUrl(parent_pipeline_id, load_data, replace))
                     .unwrap();
