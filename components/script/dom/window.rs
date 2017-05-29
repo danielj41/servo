@@ -18,6 +18,7 @@ use dom::bindings::codegen::Bindings::PermissionStatusBinding::PermissionState;
 use dom::bindings::codegen::Bindings::RequestBinding::RequestInit;
 use dom::bindings::codegen::Bindings::WindowBinding::{self, FrameRequestCallback, WindowMethods};
 use dom::bindings::codegen::Bindings::WindowBinding::{ScrollBehavior, ScrollToOptions};
+use dom::bindings::conversions::{ConversionResult, FromJSValConvertible, StringificationBehavior};
 use dom::bindings::codegen::UnionTypes::RequestOrUSVString;
 use dom::bindings::error::{Error, ErrorResult, Fallible};
 use dom::bindings::inheritance::Castable;
@@ -1536,6 +1537,7 @@ impl Window {
     }
 
     /// Commence a new URL load which will either replace this window or scroll to a fragment.
+    #[allow(unsafe_code)]
     pub fn load_url(&self, url: ServoUrl, replace: bool, force_reload: bool,
                     referrer_policy: Option<ReferrerPolicy>) {
         let doc = self.Document();
@@ -1551,6 +1553,46 @@ impl Window {
                     return
                 }
         }
+
+
+
+
+let is_javascript = url.scheme() == "javascript";
+if is_javascript {
+    use url::percent_encoding::percent_decode;
+
+    // Turn javascript: URL into JS code to eval, according to the steps in
+    // https://html.spec.whatwg.org/multipage/#javascript-protocol
+
+    // This slice of the URL’s serialization is equivalent to (5.) to (7.):
+    // Start with the scheme data of the parsed URL;
+    // append question mark and query component, if any;
+    // append number sign and fragment component if any.
+    let encoded = &url[Position::BeforePath..];
+
+    // Percent-decode (8.) and UTF-8 decode (9.)
+    let script_source = percent_decode(encoded.as_bytes()).decode_utf8_lossy();
+
+    // Script source is ready to be evaluated (11.)
+    unsafe {
+        let _ac = JSAutoCompartment::new(self.get_cx(), self.reflector().get_jsobject().get());
+        rooted!(in(self.get_cx()) let mut jsval = UndefinedValue());
+        self.upcast::<GlobalScope>().evaluate_js_on_global_with_result(
+            &script_source, jsval.handle_mut());
+        let strval = DOMString::from_jsval(self.get_cx(),
+                                           jsval.handle(),
+                                           StringificationBehavior::Empty);
+        match strval {
+            Ok(ConversionResult::Success(s)) => s,
+            _ => DOMString::new(),
+        };
+    }
+
+    return
+}
+
+
+
 
         let pipeline_id = self.upcast::<GlobalScope>().pipeline_id();
         self.main_thread_script_chan().send(
