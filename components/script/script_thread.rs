@@ -2114,7 +2114,6 @@ impl ScriptThread {
         // Notify devtools that a new script global exists.
         self.notify_devtools(document.Title(), final_url.clone(), (incomplete.pipeline_id, None));
 
-        let is_javascript = incomplete.url.scheme() == "javascript";
         let parse_input = DOMString::new();
 
         document.set_https_state(metadata.https_state);
@@ -2294,7 +2293,7 @@ impl ScriptThread {
     /// for the given pipeline (specifically the "navigate" algorithm).
     fn handle_navigate(&self, parent_pipeline_id: PipelineId,
                               browsing_context_id: Option<BrowsingContextId>,
-                              load_data: LoadData,
+                              mut load_data: LoadData,
                               replace: bool) {
         match browsing_context_id {
             Some(browsing_context_id) => {
@@ -2308,7 +2307,7 @@ impl ScriptThread {
 
 
                 let is_javascript = load_data.url.scheme() == "javascript";
-                if is_javascript {
+                load_data.js_eval_result = if is_javascript {
                     use url::percent_encoding::percent_decode;
 
                     // Turn javascript: URL into JS code to eval, according to the steps in
@@ -2336,16 +2335,16 @@ impl ScriptThread {
                                                                jsval.handle(),
                                                                StringificationBehavior::Empty);
                             match strval {
-                                Ok(ConversionResult::Success(s)) => s,
-                                _ => DOMString::new(),
-                            };
+                                Ok(ConversionResult::Success(s)) => Some(String::from(s)),
+                                _ => None,
+                            }
                         }
+                    } else {
+                        None
                     }
-
-                    return
-                }
-
-
+                } else {
+                    None
+                };
 
                 self.script_sender
                     .send((parent_pipeline_id, ScriptMsg::LoadUrl(load_data, replace)))

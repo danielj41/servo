@@ -144,6 +144,8 @@ pub struct LoadData {
     pub headers: Headers,
     /// The data.
     pub data: Option<Vec<u8>>,
+    /// The result of evaluating a javascript: scheme url.
+    pub js_eval_result: Option<String>,
     /// The referrer policy.
     pub referrer_policy: Option<ReferrerPolicy>,
     /// The referrer URL.
@@ -163,6 +165,7 @@ impl LoadData {
             method: Method::Get,
             headers: Headers::new(),
             data: None,
+            js_eval_result: None,
             referrer_policy: referrer_policy,
             referrer_url: referrer_url,
         }
