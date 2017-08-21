@@ -1494,6 +1494,8 @@ impl ScriptThread {
             Some(layout_chan) => layout_chan.send(msg).unwrap(),
         };
 
+        println!("AAAAAAA");
+
         // Kick off the fetch for the new resource.
         let new_load = InProgressLoad::new(new_pipeline_id,
                                            browsing_context_id,
@@ -1504,7 +1506,7 @@ impl ScriptThread {
                                            load_data.url.clone(),
                                            origin);
         if load_data.url.as_str() == "about:blank" {
-            self.start_page_load_about_blank(new_load);
+            self.start_page_load_about_blank(new_load, load_data.js_eval_result);
         } else {
             self.pre_page_load(new_load, load_data);
         }
@@ -2346,6 +2348,12 @@ impl ScriptThread {
                     None
                 };
 
+                if is_javascript {
+                    load_data.url = ServoUrl::parse("about:blank").unwrap();
+                }
+
+
+                println!("BBAA");
                 self.script_sender
                     .send((parent_pipeline_id, ScriptMsg::LoadUrl(load_data, replace)))
                     .unwrap();
@@ -2443,7 +2451,7 @@ impl ScriptThread {
 
     /// Synchronously fetch `about:blank`. Stores the `InProgressLoad`
     /// argument until a notification is received that the fetch is complete.
-    fn start_page_load_about_blank(&self, incomplete: InProgressLoad) {
+    fn start_page_load_about_blank(&self, incomplete: InProgressLoad, body: Option<String>) {
         let id = incomplete.pipeline_id;
 
         self.incomplete_loads.borrow_mut().push(incomplete);
@@ -2454,6 +2462,14 @@ impl ScriptThread {
         let mut meta = Metadata::default(url);
         meta.set_content_type(Some(&mime!(Text / Html)));
         context.process_response(Ok(FetchMetadata::Unfiltered(meta)));
+        /*let chunk = match body {
+            Some(string) => string.as_bytes().to_vec(),
+            None => vec![]
+        };*/
+
+        if let Some(aaa) = body {
+            println!("hey {}", aaa);
+        }
         context.process_response_chunk(vec![]);
         context.process_response_eof(Ok(()));
     }
