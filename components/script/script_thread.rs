@@ -2462,15 +2462,11 @@ impl ScriptThread {
         let mut meta = Metadata::default(url);
         meta.set_content_type(Some(&mime!(Text / Html)));
         context.process_response(Ok(FetchMetadata::Unfiltered(meta)));
-        /*let chunk = match body {
+        let chunk = match body {
             Some(string) => string.as_bytes().to_vec(),
             None => vec![]
-        };*/
-
-        if let Some(aaa) = body {
-            println!("hey {}", aaa);
-        }
-        context.process_response_chunk(vec![]);
+        };
+        context.process_response_chunk(chunk);
         context.process_response_eof(Ok(()));
     }
 
