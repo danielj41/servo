@@ -1677,6 +1677,18 @@ impl ScriptThread {
         match idx {
             Some(idx) => {
                 let load = self.incomplete_loads.borrow_mut().remove(idx);
+
+                match metadata {
+                    Some(ref meta) => match meta.status {
+                        Some((204, _)) => {
+                            println!("heey");
+                            return None;
+                        },
+                        _ => ()
+                    },
+                    _ => ()
+                };
+
                 metadata.map(|meta| self.load(meta, load))
             }
             None => {
@@ -2464,16 +2476,18 @@ impl ScriptThread {
 
         let mut meta = Metadata::default(url);
         meta.set_content_type(Some(&mime!(Text / Html)));
-        context.process_response(Ok(FetchMetadata::Unfiltered(meta)));
+
         let chunk = match js_eval_result {
             Some(JsEvalResult::Ok(string)) => string.as_bytes().to_vec(),
             Some(JsEvalResult::NoContent) => {
                 meta.status = Some((204, b"No Content".to_vec()));
+                println!("no content");
                 vec![]
             },
             None => vec![]
         };
 
+        context.process_response(Ok(FetchMetadata::Unfiltered(meta)));
         context.process_response_chunk(chunk);
         context.process_response_eof(Ok(()));
     }
