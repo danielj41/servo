@@ -2332,13 +2332,16 @@ impl ScriptThread {
                         window.upcast::<GlobalScope>().evaluate_js_on_global_with_result(
                             &script_source, jsval.handle_mut());
 
-                        unsafe {
-                            let strval = DOMString::from_jsval(self.get_cx(),
-                                                               jsval.handle(),
-                                                               StringificationBehavior::Empty);
-                            match strval {
-                                Ok(ConversionResult::Success(s)) => Some(String::from(s)),
-                                _ => None,
+                        match jsval.get().is_string() {
+                            false => None,
+                            true => unsafe {
+                                let strval = DOMString::from_jsval(self.get_cx(),
+                                                                   jsval.handle(),
+                                                                   StringificationBehavior::Empty);
+                                match strval {
+                                    Ok(ConversionResult::Success(s)) => Some(String::from(s)),
+                                    _ => None,
+                                }
                             }
                         }
                     } else {
