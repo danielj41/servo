@@ -87,7 +87,7 @@ use script_runtime::{CommonScriptMsg, ScriptChan, ScriptThreadEventCategory};
 use script_runtime::{ScriptPort, StackRootTLS, get_reports, new_rt_and_cx};
 use script_traits::{CompositorEvent, ConstellationControlMsg};
 use script_traits::{DocumentActivity, DiscardBrowsingContext, EventResult};
-use script_traits::{InitialScriptState, LayoutMsg, LoadData, MouseButton, MouseEventType, MozBrowserEvent};
+use script_traits::{InitialScriptState, JsEvalResult, LayoutMsg, LoadData, MouseButton, MouseEventType, MozBrowserEvent};
 use script_traits::{NewLayoutInfo, ScriptToConstellationChan, ScriptMsg, UpdatePipelineIdReason};
 use script_traits::{ScriptThreadFactory, TimerEvent, TimerSchedulerMsg, TimerSource};
 use script_traits::{TouchEventType, TouchId, UntrustedNodeAddress, WindowSizeData, WindowSizeType};
@@ -2333,13 +2333,13 @@ impl ScriptThread {
                             &script_source, jsval.handle_mut());
 
                         match jsval.get().is_string() {
-                            false => None,
+                            false => Some(JsEvalResult::NoContent),
                             true => unsafe {
                                 let strval = DOMString::from_jsval(self.get_cx(),
                                                                    jsval.handle(),
                                                                    StringificationBehavior::Empty);
                                 match strval {
-                                    Ok(ConversionResult::Success(s)) => Some(String::from(s)),
+                                    Ok(ConversionResult::Success(s)) => Some(JsEvalResult::Ok(String::from(s))),
                                     _ => None,
                                 }
                             }
@@ -2454,7 +2454,7 @@ impl ScriptThread {
 
     /// Synchronously fetch `about:blank`. Stores the `InProgressLoad`
     /// argument until a notification is received that the fetch is complete.
-    fn start_page_load_about_blank(&self, incomplete: InProgressLoad, body: Option<String>) {
+    fn start_page_load_about_blank(&self, incomplete: InProgressLoad, js_eval_result: Option<JsEvalResult>) {
         let id = incomplete.pipeline_id;
 
         self.incomplete_loads.borrow_mut().push(incomplete);
@@ -2465,8 +2465,9 @@ impl ScriptThread {
         let mut meta = Metadata::default(url);
         meta.set_content_type(Some(&mime!(Text / Html)));
         context.process_response(Ok(FetchMetadata::Unfiltered(meta)));
-        let chunk = match body {
-            Some(string) => string.as_bytes().to_vec(),
+        let chunk = match js_eval_result {
+            Some(JsEvalResult::Ok(string)) => string.as_bytes().to_vec(),
+            Some(JsEvalResult::NoContent) => vec![],
             None => vec![]
         };
         context.process_response_chunk(chunk);
