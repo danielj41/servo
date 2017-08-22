@@ -2467,9 +2467,13 @@ impl ScriptThread {
         context.process_response(Ok(FetchMetadata::Unfiltered(meta)));
         let chunk = match js_eval_result {
             Some(JsEvalResult::Ok(string)) => string.as_bytes().to_vec(),
-            Some(JsEvalResult::NoContent) => vec![],
+            Some(JsEvalResult::NoContent) => {
+                meta.status = Some((204, b"No Content".to_vec()));
+                vec![]
+            },
             None => vec![]
         };
+
         context.process_response_chunk(chunk);
         context.process_response_eof(Ok(()));
     }
