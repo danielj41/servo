@@ -159,7 +159,7 @@ pub enum JsEvalResult {
     /// https://html.spec.whatwg.org/multipage/browsing-the-web.html#navigate 12.11
     NoContent,
     /// The js evaluation had a string result.
-    Ok(String)
+    Ok(Vec<u8>)
 }
 
 impl LoadData {

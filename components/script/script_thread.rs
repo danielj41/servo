@@ -2317,11 +2317,8 @@ impl ScriptThread {
                 }
             }
             None => {
-
-
-
                 let is_javascript = load_data.url.scheme() == "javascript";
-                load_data.js_eval_result = if is_javascript {
+                if is_javascript {
                     use url::percent_encoding::percent_decode;
 
                     // Turn javascript: URL into JS code to eval, according to the steps in
@@ -2344,29 +2341,26 @@ impl ScriptThread {
                         window.upcast::<GlobalScope>().evaluate_js_on_global_with_result(
                             &script_source, jsval.handle_mut());
 
-                        match jsval.get().is_string() {
-                            false => Some(JsEvalResult::NoContent),
+                        load_data.js_eval_result = match jsval.get().is_string() {
                             true => unsafe {
                                 let strval = DOMString::from_jsval(self.get_cx(),
                                                                    jsval.handle(),
                                                                    StringificationBehavior::Empty);
                                 match strval {
-                                    Ok(ConversionResult::Success(s)) => Some(JsEvalResult::Ok(String::from(s))),
+                                    Ok(ConversionResult::Success(s)) => {
+                                        Some(JsEvalResult::Ok(String::from(s).as_bytes().to_vec()))
+                                    },
                                     _ => None,
                                 }
-                            }
+                            },
+                            false => Some(JsEvalResult::NoContent),
                         }
-                    } else {
-                        None
                     }
-                } else {
-                    None
-                };
+                }
 
                 if is_javascript {
                     load_data.url = ServoUrl::parse("about:blank").unwrap();
                 }
-
 
                 println!("BBAA");
                 self.script_sender
@@ -2478,7 +2472,7 @@ impl ScriptThread {
         meta.set_content_type(Some(&mime!(Text / Html)));
 
         let chunk = match js_eval_result {
-            Some(JsEvalResult::Ok(string)) => string.as_bytes().to_vec(),
+            Some(JsEvalResult::Ok(content)) => content,
             Some(JsEvalResult::NoContent) => {
                 meta.status = Some((204, b"No Content".to_vec()));
                 println!("no content");
