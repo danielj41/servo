@@ -2417,10 +2417,6 @@ impl ScriptThread {
             .. RequestInit::default()
         };
 
-        if req_init.url.scheme() == "javascript" {
-            req_init.url = ServoUrl::parse("about:blank").unwrap();
-        }
-
         let context = ParserContext::new(id, load_data.url);
         self.incomplete_parser_contexts.borrow_mut().push((id, context));
 
@@ -2471,6 +2467,8 @@ impl ScriptThread {
         let mut meta = Metadata::default(url);
         meta.set_content_type(Some(&mime!(Text / Html)));
 
+        // If this page load is the result of a javascript scheme url, map
+        // the evaluation result into a response.
         let chunk = match js_eval_result {
             Some(JsEvalResult::Ok(content)) => content,
             Some(JsEvalResult::NoContent) => {
