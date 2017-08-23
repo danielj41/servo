@@ -1494,8 +1494,6 @@ impl ScriptThread {
             Some(layout_chan) => layout_chan.send(msg).unwrap(),
         };
 
-        println!("AAAAAAA");
-
         // Kick off the fetch for the new resource.
         let new_load = InProgressLoad::new(new_pipeline_id,
                                            browsing_context_id,
@@ -2315,6 +2313,8 @@ impl ScriptThread {
                 if let Some(iframe) = iframe {
                     iframe.navigate_or_reload_child_browsing_context(Some(load_data), NavigationType::Regular, replace);
                 }
+
+                // TODO: Test javascript: urls in iframes
             }
             None => {
                 let is_javascript = load_data.url.scheme() == "javascript";
@@ -2341,8 +2341,8 @@ impl ScriptThread {
                         window.upcast::<GlobalScope>().evaluate_js_on_global_with_result(
                             &script_source, jsval.handle_mut());
 
-                        load_data.js_eval_result = match jsval.get().is_string() {
-                            true => unsafe {
+                        load_data.js_eval_result = if jsval.get().is_string() {
+                            unsafe {
                                 let strval = DOMString::from_jsval(self.get_cx(),
                                                                    jsval.handle(),
                                                                    StringificationBehavior::Empty);
@@ -2352,9 +2352,10 @@ impl ScriptThread {
                                     },
                                     _ => None,
                                 }
-                            },
-                            false => Some(JsEvalResult::NoContent),
-                        }
+                            }
+                        } else {
+                            Some(JsEvalResult::NoContent)
+                        };
                     }
                 }
 
@@ -2362,7 +2363,6 @@ impl ScriptThread {
                     load_data.url = ServoUrl::parse("about:blank").unwrap();
                 }
 
-                println!("BBAA");
                 self.script_sender
                     .send((parent_pipeline_id, ScriptMsg::LoadUrl(load_data, replace)))
                     .unwrap();
@@ -2401,7 +2401,7 @@ impl ScriptThread {
     /// argument until a notification is received that the fetch is complete.
     fn pre_page_load(&self, incomplete: InProgressLoad, load_data: LoadData) {
         let id = incomplete.pipeline_id.clone();
-        let mut req_init = RequestInit {
+        let req_init = RequestInit {
             url: load_data.url.clone(),
             method: load_data.method,
             destination: Destination::Document,
@@ -2473,7 +2473,6 @@ impl ScriptThread {
             Some(JsEvalResult::Ok(content)) => content,
             Some(JsEvalResult::NoContent) => {
                 meta.status = Some((204, b"No Content".to_vec()));
-                println!("no content");
                 vec![]
             },
             None => vec![]
